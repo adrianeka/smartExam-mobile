@@ -5,10 +5,11 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.p79smartexam.smartexam.database.DummyData
+import com.p79smartexam.smartexam.api.Retrofit
 import com.p79smartexam.smartexam.database.SoalDao
 import com.p79smartexam.smartexam.model.Soal
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,9 +23,14 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import retrofit2.awaitResponse
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
+
+    companion object {
+        var hasFetched = false
+    }
 
     enum class Filter {
         ALL, PILIHAN, ESSAI, UNSYNCED, SYNCED
@@ -35,7 +41,12 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
     private val _saveStatus = MutableStateFlow("Siap")
     val saveStatus: StateFlow<String> = _saveStatus.asStateFlow()
 
-    // Internet Check
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val apiService = Retrofit.getInstance()
+
+    // Connectivity Observation
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     
     val isOnline: StateFlow<Boolean> = callbackFlow {
@@ -62,10 +73,54 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), true)
 
-    init {
+    fun fetchSoalFromApi() {
+        if (hasFetched) return
+        hasFetched = true
+
         viewModelScope.launch {
-            dao.deleteAll()
-            DummyData.defaultDummyData.forEach { dao.insert(it) }
+            _isLoading.value = true
+            _saveStatus.value = "Mengambil soal..."
+            try {
+                val response = apiService.getSoal().awaitResponse()
+                if (response.isSuccessful) {
+                    val soalResponse = response.body()
+                    val dataItems = soalResponse?.data
+                    if (dataItems != null) {
+                        dao.deleteAll()
+                        
+                        dataItems.filterNotNull().forEach { dataItem ->
+                            val tipeSoal = dataItem.type!!.toInt()
+                            
+                            val pilihan = if (tipeSoal == 1) {
+                                val opt = dataItem.options
+                                listOfNotNull(opt?.a, opt?.b, opt?.c, opt?.d).joinToString(" ~ ")
+                            } else {
+                                ""
+                            }
+
+                            val soal = Soal(
+                                id = dataItem.id?.toLong() ?: 0L,
+                                soal = dataItem.question ?: "",
+                                tipeSoal = tipeSoal,
+                                pilihan = pilihan,
+                                jawaban = "",
+                                isSynced = false
+                            )
+                            dao.insert(soal)
+                        }
+                        _saveStatus.value = "Soal diperbarui dari API"
+                    } else {
+                        _saveStatus.value = "Gagal memproses data API"
+                    }
+                } else {
+                    _saveStatus.value = "Gagal mengambil soal (Server error)"
+                }
+            } catch (e: Exception) {
+                Log.e("TestViewModel", "Error fetching from API", e)
+                _saveStatus.value = "Offline / Gagal mengambil soal"
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -79,7 +134,7 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
         }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(),
+        started = SharingStarted.WhileSubscribed(5000L),
         initialValue = emptyList()
     )
 

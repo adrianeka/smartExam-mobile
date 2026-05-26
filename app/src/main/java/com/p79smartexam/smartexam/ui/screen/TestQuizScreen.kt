@@ -14,15 +14,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -31,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -38,26 +41,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.p79smartexam.smartexam.database.SmartExamDb
 import com.p79smartexam.smartexam.model.Soal
+import com.p79smartexam.smartexam.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TestQuizScreen(
-    navController: NavHostController,
-    viewModel: TestViewModel = viewModel(
+    navController: NavHostController
+) {
+    val viewModel: TestViewModel = viewModel(
         factory = TestViewModelFactory(
             SmartExamDb.getInstance(LocalContext.current).dao,
             LocalContext.current
         )
     )
-) {
     val data by viewModel.data.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val saveStatus by viewModel.saveStatus.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.fetchSoalFromApi()
+    }
 
     Scaffold(
         topBar = {
@@ -69,14 +81,6 @@ fun TestQuizScreen(
                             text = saveStatus,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
                         )
                     }
                 },
@@ -93,14 +97,22 @@ fun TestQuizScreen(
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { navController.navigate(Screen.TestData.route) }) {
+                Icon(
+                    imageVector = Icons.Filled.Storage,
+                    contentDescription = "Database Lokal",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             // Connectivity Banner
             AnimatedVisibility(visible = !isOnline) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth()
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
@@ -114,7 +126,7 @@ fun TestQuizScreen(
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
-                            text = "Mode Offline: Progres Disimpan!",
+                            text = "Mode Offline: Jawaban disimpan lokal",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -122,19 +134,35 @@ fun TestQuizScreen(
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(data, key = { it.id }) { soal ->
-                    QuizItem(
-                        soal = soal,
-                        onAnswerChanged = { newAnswer ->
-                            viewModel.updateJawaban(soal, newAnswer)
-                        }
+            if (isLoading) {
+                LoadingDialog(message = saveStatus)
+            }
+
+            if (data.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Tidak ada kuis tersedia",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(data, key = { it.id }) { soal ->
+                        QuizItem(
+                            soal = soal,
+                            onAnswerChanged = { newAnswer ->
+                                viewModel.updateJawaban(soal, newAnswer)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -171,8 +199,7 @@ fun QuizItem(
                 val options = soal.pilihan.split(" ~ ")
                 options.forEach { option ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth()
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.Top
                     ) {
@@ -183,8 +210,7 @@ fun QuizItem(
                         Text(
                             text = option,
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier
-                                .padding(start = 8.dp)
+                            modifier = Modifier.padding(start = 8.dp)
                                 .weight(1f)
                         )
                     }
@@ -196,6 +222,45 @@ fun QuizItem(
                     label = { Text("Jawaban Anda") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LoadingDialog(
+    message: String = "Memuat data..."
+) {
+    Dialog(
+        onDismissRequest = { },
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Box(
+            modifier = Modifier.size(width = 220.dp, height = 160.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(16.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(16.dp)
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
                 )
             }
         }

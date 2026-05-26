@@ -12,7 +12,7 @@ import com.p79smartexam.smartexam.ui.screen.TestQuizScreen
 fun SetupNavGraph(navController: NavHostController = rememberNavController()) {
     NavHost(
         navController = navController,
-        startDestination = Screen.TestData.route
+        startDestination = Screen.TestQuiz.route
     ) {
         composable(route = Screen.TestData.route) {
             TestDataScreen(navController = navController)
