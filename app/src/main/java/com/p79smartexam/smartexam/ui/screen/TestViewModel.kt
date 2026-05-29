@@ -89,7 +89,7 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
                         dao.deleteAll()
                         
                         dataItems.filterNotNull().forEach { dataItem ->
-                            val tipeSoal = dataItem.type!!.toInt()
+                            val tipeSoal = dataItem.type!!
                             
                             val pilihan = if (tipeSoal == 1) {
                                 val opt = dataItem.options
@@ -122,6 +122,11 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun retryFetch() {
+        hasFetched = false
+        fetchSoalFromApi()
     }
 
     val data: StateFlow<List<Soal>> = currentFilter.flatMapLatest { f ->

@@ -26,7 +26,7 @@ data class DataItem(
 	val id: Int? = null,
 
 	@field:SerializedName("type")
-	val type: String? = null
+	val type: Int? = null
 )
 
 data class Options(
