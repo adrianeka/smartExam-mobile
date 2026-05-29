@@ -9,7 +9,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.p79smartexam.smartexam.api.AnswersItem
 import com.p79smartexam.smartexam.api.Retrofit
+import com.p79smartexam.smartexam.api.SubmitJawabanRequest
 import com.p79smartexam.smartexam.database.SoalDao
 import com.p79smartexam.smartexam.model.Soal
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import retrofit2.awaitResponse
@@ -43,6 +46,8 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val saveJobs = mutableMapOf<Long, kotlinx.coroutines.Job>()
 
     private val apiService = Retrofit.getInstance()
 
@@ -89,7 +94,8 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
                         dao.deleteAll()
                         
                         dataItems.filterNotNull().forEach { dataItem ->
-                            val tipeSoal = dataItem.type!!
+                            val tipeSoal = dataItem.type ?: if (dataItem.options != null && 
+                                (!dataItem.options.a.isNullOrEmpty() || !dataItem.options.b.isNullOrEmpty())) 1 else 2
                             
                             val pilihan = if (tipeSoal == 1) {
                                 val opt = dataItem.options
@@ -148,11 +154,44 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
     }
 
     fun updateJawaban(soal: Soal, jawaban: String) {
-        viewModelScope.launch {
+        saveJobs[soal.id]?.cancel()
+        saveJobs[soal.id] = viewModelScope.launch {
+            _saveStatus.value = "Menunggu 3 detik..."
+            delay(3000)
             _saveStatus.value = "Menyimpan..."
             dao.update(soal.copy(jawaban = jawaban, isSynced = false))
-            delay(500)
             _saveStatus.value = "Tersimpan Lokal"
+        }
+    }
+
+    fun submitJawaban() {
+        viewModelScope.launch {
+            _saveStatus.value = "Mensubmit jawaban..."
+            _isLoading.value = true
+            try {
+                val allSoal = dao.getAll().first()
+                val answers = allSoal.map {
+                    AnswersItem(id = it.id.toInt(), answer = it.jawaban)
+                }
+                
+                val request = SubmitJawabanRequest(answers = answers)
+                val response = apiService.submitJawaban(request).awaitResponse()
+                
+                if (response.isSuccessful && response.body()?.success == true) {
+                    _saveStatus.value = "Jawaban berhasil disubmit"
+                    // Mark as synced
+                    allSoal.forEach { 
+                        dao.update(it.copy(isSynced = true))
+                    }
+                } else {
+                    _saveStatus.value = "Gagal submit: ${response.body()?.message ?: "Server error"}"
+                }
+            } catch (e: Exception) {
+                Log.e("TestViewModel", "Error submitting to API", e)
+                _saveStatus.value = "Gagal submit: Offline / Error"
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 }

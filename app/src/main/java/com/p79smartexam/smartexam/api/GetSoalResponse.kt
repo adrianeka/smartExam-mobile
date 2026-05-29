@@ -2,7 +2,7 @@ package com.p79smartexam.smartexam.api
 
 import com.google.gson.annotations.SerializedName
 
-data class SoalResponse(
+data class GetSoalResponse(
 
 	@field:SerializedName("data")
 	val data: List<DataItem?>? = null,

@@ -37,6 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -158,8 +161,7 @@ fun TestQuizScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(data, key = { it.id }) { soal ->
@@ -169,6 +171,14 @@ fun TestQuizScreen(
                                 viewModel.updateJawaban(soal, newAnswer)
                             }
                         )
+                    }
+                    item {
+                        Button(
+                            onClick = { viewModel.submitJawaban() },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                        ) {
+                            Text("Submit Jawaban")
+                        }
                     }
                 }
             }
@@ -181,6 +191,8 @@ fun QuizItem(
     soal: Soal,
     onAnswerChanged: (String) -> Unit
 ) {
+    var localAnswer by remember(soal.id) { mutableStateOf(soal.jawaban) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -206,13 +218,15 @@ fun QuizItem(
                 val options = soal.pilihan.split(" ~ ")
                 options.forEach { option ->
                     Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.Top
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
-                            selected = (soal.jawaban == option),
-                            onClick = { onAnswerChanged(option) }
+                            selected = (localAnswer == option),
+                            onClick = {
+                                localAnswer = option
+                                onAnswerChanged(option)
+                            }
                         )
                         Text(
                             text = option,
@@ -224,8 +238,11 @@ fun QuizItem(
                 }
             } else {
                 OutlinedTextField(
-                    value = soal.jawaban,
-                    onValueChange = onAnswerChanged,
+                    value = localAnswer,
+                    onValueChange = {
+                        localAnswer = it
+                        onAnswerChanged(it)
+                    },
                     label = { Text("Jawaban Anda") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
