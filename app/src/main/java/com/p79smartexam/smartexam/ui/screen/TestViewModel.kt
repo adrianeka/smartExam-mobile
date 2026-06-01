@@ -1,5 +1,6 @@
 package com.p79smartexam.smartexam.ui.screen
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -9,11 +10,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.p79smartexam.smartexam.api.AnswersItem
 import com.p79smartexam.smartexam.api.Retrofit
-import com.p79smartexam.smartexam.api.SubmitJawabanRequest
 import com.p79smartexam.smartexam.database.SoalDao
 import com.p79smartexam.smartexam.model.Soal
+import androidx.core.content.ContextCompat.startForegroundService
+import com.p79smartexam.smartexam.util.SubmitJawabanService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -23,13 +24,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import retrofit2.awaitResponse
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
+@SuppressLint("StaticFieldLeak")
+class TestViewModel(private val dao: SoalDao, private val context: Context) : ViewModel() {
 
     companion object {
         var hasFetched = false
@@ -165,34 +166,11 @@ class TestViewModel(private val dao: SoalDao, context: Context) : ViewModel() {
     }
 
     fun submitJawaban() {
-        viewModelScope.launch {
-            _saveStatus.value = "Mensubmit jawaban..."
-            _isLoading.value = true
-            try {
-                val allSoal = dao.getAll().first()
-                val answers = allSoal.map {
-                    AnswersItem(id = it.id.toInt(), answer = it.jawaban)
-                }
-                
-                val request = SubmitJawabanRequest(answers = answers)
-                val response = apiService.submitJawaban(request).awaitResponse()
-                
-                if (response.isSuccessful && response.body()?.success == true) {
-                    _saveStatus.value = "Jawaban berhasil disubmit"
-                    // Mark as synced
-                    allSoal.forEach { 
-                        dao.update(it.copy(isSynced = true))
-                    }
-                } else {
-                    _saveStatus.value = "Gagal submit: ${response.body()?.message ?: "Server error"}"
-                }
-            } catch (e: Exception) {
-                Log.e("TestViewModel", "Error submitting to API", e)
-                _saveStatus.value = "Gagal submit: Offline / Error"
-            } finally {
-                _isLoading.value = false
-            }
-        }
+        // --- Foreground Service ---
+        val intent = android.content.Intent(context, SubmitJawabanService::class.java)
+        startForegroundService(context, intent)
+
+        _saveStatus.value = "Proses diserahkan ke background"
     }
 }
 

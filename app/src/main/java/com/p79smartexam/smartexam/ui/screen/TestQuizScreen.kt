@@ -1,5 +1,9 @@
 package com.p79smartexam.smartexam.ui.screen
 
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -70,6 +75,28 @@ fun TestQuizScreen(
     val isOnline by viewModel.isOnline.collectAsState()
     val saveStatus by viewModel.saveStatus.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+
+    val context = LocalContext.current
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasNotificationPermission = isGranted
+        // Lanjutkan submit tanpa peduli diizinkan atau tidak, karena izin sekadar untuk notif
+        viewModel.submitJawaban()
+    }
 
     LaunchedEffect(Unit) {
         viewModel.fetchSoalFromApi()
@@ -174,7 +201,13 @@ fun TestQuizScreen(
                     }
                     item {
                         Button(
-                            onClick = { viewModel.submitJawaban() },
+                            onClick = { 
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                                    permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    viewModel.submitJawaban() 
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
                         ) {
                             Text("Submit Jawaban")
