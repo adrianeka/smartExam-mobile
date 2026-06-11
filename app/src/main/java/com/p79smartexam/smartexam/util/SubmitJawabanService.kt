@@ -15,16 +15,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.p79smartexam.smartexam.R
-import com.p79smartexam.smartexam.api.AnswersItem
-import com.p79smartexam.smartexam.api.Retrofit
-import com.p79smartexam.smartexam.api.SubmitJawabanRequest
-import com.p79smartexam.smartexam.database.SmartExamDb
+import com.p79smartexam.smartexam.SmartExamApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import retrofit2.awaitResponse
 
 class SubmitJawabanService : Service() {
 
@@ -81,41 +77,24 @@ class SubmitJawabanService : Service() {
         serviceScope.launch {
             updateNotification("Memproses Sinkronisasi", "Sedang mengirim jawaban...", false)
             
-            val dao = SmartExamDb.getInstance(applicationContext).dao
-            val apiService = Retrofit.getInstance()
+            val app = applicationContext as SmartExamApplication
+            val repository = app.container.soalRepository
 
             try {
-                val unsyncedList = dao.getUnsyncedAnswers().first()
+                val unsyncedList = repository.getUnsyncedAnswers().first()
                 if (unsyncedList.isEmpty()) {
                     stopServiceSuccess()
                     return@launch
                 }
 
-                val chunks = unsyncedList.chunked(50)
-                
-                for (chunk in chunks) {
-                    val answers = chunk.map {
-                        AnswersItem(id = it.id.toInt(), answer = it.jawaban)
-                    }
-                    
-                    val request = SubmitJawabanRequest(answers = answers)
-                    val response = apiService.submitJawaban(request).awaitResponse()
-
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        chunk.forEach { 
-                            dao.update(it.copy(isSynced = true))
-                        }
-                    } else {
-                        val errorMsg = response.body()?.message ?: "Server Error"
-                        Log.e("SubmitJawabanService", "Failed to submit: $errorMsg")
-                        updateNotification("Sinkronisasi Gagal", "Gagal mengirim: $errorMsg. Menunggu jaringan...", false)
-                        isSyncing = false
-                        return@launch 
-                    }
+                val result = repository.submitUnsyncedAnswers(unsyncedList)
+                if (result.isSuccess) {
+                    stopServiceSuccess()
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Server Error"
+                    updateNotification("Sinkronisasi Gagal", "Gagal mengirim: $errorMsg. Menunggu jaringan...", false)
+                    isSyncing = false
                 }
-
-                stopServiceSuccess()
-
             } catch (e: Exception) {
                 Log.e("SubmitJawabanService", "Error submitting", e)
                 updateNotification("Sinkronisasi Gagal", "Koneksi/Error: Menunggu jaringan...", false)
@@ -170,7 +149,7 @@ class SubmitJawabanService : Service() {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback)
             } catch (e: Exception) {
-                // Ignore
+
             }
         }
     }

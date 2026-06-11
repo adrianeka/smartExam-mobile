@@ -1,4 +1,4 @@
-package com.p79smartexam.smartexam.database
+package com.p79smartexam.smartexam.data.local
 
 import android.content.Context
 import androidx.room.Database

@@ -1,4 +1,4 @@
-package com.p79smartexam.smartexam.api
+package com.p79smartexam.smartexam.data.remote
 
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

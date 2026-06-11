@@ -1,4 +1,4 @@
-package com.p79smartexam.smartexam.database
+package com.p79smartexam.smartexam.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert

@@ -1,5 +1,6 @@
 package com.p79smartexam.smartexam.ui.screen
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,35 +49,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.p79smartexam.smartexam.database.SmartExamDb
+import com.p79smartexam.smartexam.R
+import com.p79smartexam.smartexam.SmartExamApplication
 import com.p79smartexam.smartexam.model.Soal
 import com.p79smartexam.smartexam.navigation.Screen
+import com.p79smartexam.smartexam.ui.viewmodel.TestViewModel
+import com.p79smartexam.smartexam.ui.viewmodel.TestViewModelFactory
+import com.p79smartexam.smartexam.util.SubmitJawabanService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TestQuizScreen(
     navController: NavHostController
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as SmartExamApplication
+
+    val startSubmitService = {
+        val intent = Intent(context, SubmitJawabanService::class.java)
+        ContextCompat.startForegroundService(context, intent)
+    }
+
     val viewModel: TestViewModel = viewModel(
         factory = TestViewModelFactory(
-            SmartExamDb.getInstance(LocalContext.current).dao,
-            LocalContext.current
+            app.container.soalRepository,
+            app.container.networkObserver,
+            startSubmitService
         )
     )
-    val data by viewModel.data.collectAsState()
-    val isOnline by viewModel.isOnline.collectAsState()
-    val saveStatus by viewModel.saveStatus.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val data = uiState.data
+    val isOnline = uiState.isOnline
+    val saveStatus = uiState.saveStatus
+    val isLoading = uiState.isLoading
 
-    val context = LocalContext.current
     var hasNotificationPermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -107,7 +122,7 @@ fun TestQuizScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(text = "Test Quiz", style = MaterialTheme.typography.titleLarge)
+                        Text(text = stringResource(id = R.string.title_test_quiz), style = MaterialTheme.typography.titleLarge)
                         Text(
                             text = saveStatus,
                             style = MaterialTheme.typography.labelSmall,
@@ -130,7 +145,10 @@ fun TestQuizScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate(Screen.TestData.route) }) {
+            FloatingActionButton(
+                modifier = Modifier.padding(bottom = 64.dp),
+                onClick = { navController.navigate(Screen.TestData.route) }
+            ) {
                 Icon(
                     imageVector = Icons.Filled.Storage,
                     contentDescription = "Database Lokal",
@@ -140,7 +158,7 @@ fun TestQuizScreen(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            // Connectivity Banner
+            // Tampilkan banner status koneksi
             AnimatedVisibility(visible = !isOnline) {
                 Box(
                     modifier = Modifier.fillMaxWidth()
@@ -157,7 +175,7 @@ fun TestQuizScreen(
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
-                            text = "Mode Offline",
+                            text = stringResource(id = R.string.mode_offline),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -176,13 +194,13 @@ fun TestQuizScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Tidak ada kuis tersedia",
+                            text = stringResource(id = R.string.no_quiz_available),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(onClick = { viewModel.retryFetch() }) {
-                            Text("Coba Lagi")
+                            Text(stringResource(id = R.string.btn_coba_lagi))
                         }
                     }
                 }
@@ -210,7 +228,7 @@ fun TestQuizScreen(
                             },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
                         ) {
-                            Text("Submit Jawaban")
+                            Text(stringResource(id = R.string.btn_submit_jawaban))
                         }
                     }
                 }
@@ -234,7 +252,7 @@ fun QuizItem(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "Pertanyaan ${soal.id}",
+                text = stringResource(id = R.string.format_pertanyaan, soal.id),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.secondary
             )
@@ -276,7 +294,7 @@ fun QuizItem(
                         localAnswer = it
                         onAnswerChanged(it)
                     },
-                    label = { Text("Jawaban Anda") },
+                    label = { Text(stringResource(id = R.string.label_jawaban_anda)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
@@ -287,7 +305,7 @@ fun QuizItem(
 
 @Composable
 fun LoadingDialog(
-    message: String = "Memuat data..."
+    message: String
 ) {
     Dialog(
         onDismissRequest = { },

@@ -1,4 +1,4 @@
-package com.p79smartexam.smartexam.api
+package com.p79smartexam.smartexam.data.remote
 
 import com.google.gson.annotations.SerializedName
 

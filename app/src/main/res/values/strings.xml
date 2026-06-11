@@ -1,3 +1,36 @@
 <resources>
     <string name="app_name">Smart Exam - Mobile</string>
+    
+    <!-- TestDataScreen -->
+    <string name="title_data_db_lokal">Data DB Lokal</string>
+    <string name="no_data">Tidak ada data</string>
+    <string name="format_id_type">ID: %1$d | Type: %2$d</string>
+    <string name="format_jawaban">Jawaban: %1$s</string>
+    <string name="status_synced">Synced</string>
+    <string name="status_not_synced">Not Synced</string>
+    
+    <string name="preview_data_lengkap">Preview Data Lengkap</string>
+    <string name="format_id">ID: %1$d</string>
+    <string name="format_tipe_soal">Tipe Soal: %1$s</string>
+    <string name="pilihan_ganda">Pilihan Ganda</string>
+    <string name="essay">Essay</string>
+    <string name="label_soal">Soal:</string>
+    <string name="label_pilihan_jawaban">Pilihan Jawaban:</string>
+    <string name="label_jawaban">Jawaban:</string>
+    <string name="belum_dijawab">(Belum Dijawab)</string>
+    <string name="label_status_sinkronisasi">Status Sinkronisasi:</string>
+    <string name="sudah_sinkron">Sudah Sinkron</string>
+    <string name="belum_sinkron">Belum Sinkron</string>
+    <string name="btn_tutup">Tutup</string>
+
+    <!-- TestQuizScreen -->
+    <string name="title_test_quiz">Test Quiz</string>
+    <string name="mode_offline">Mode Offline</string>
+    <string name="no_quiz_available">Tidak ada kuis tersedia</string>
+    <string name="btn_coba_lagi">Coba Lagi</string>
+    <string name="format_pertanyaan">Pertanyaan %1$d</string>
+    <string name="label_jawaban_anda">Jawaban Anda</string>
+    <string name="memuat_data">Memuat data...</string>
+    <string name="btn_submit_jawaban">Simpan Jawaban</string>
+
 </resources>
